@@ -1,6 +1,7 @@
 package com.example.mirrorclinic
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
@@ -14,14 +15,21 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -42,14 +50,20 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MirrorSetupScreen() {
     val context = LocalContext.current
     val activity = context as ComponentActivity
+    val prefs = context.getSharedPreferences(MirrorService.PREFS, Context.MODE_PRIVATE)
+
+    var position by remember {
+        mutableStateOf(prefs.getString(MirrorService.KEY_POS, "top") ?: "top")
+    }
 
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* result ignored; notification is optional */ }
+    ) { /* notification permission is optional */ }
 
     val projectionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -60,9 +74,21 @@ fun MirrorSetupScreen() {
                 putExtra(MirrorService.EXTRA_DATA, result.data)
             }
             ContextCompat.startForegroundService(context, svc)
-            // Send our app to the background so the Mirror button floats over other apps.
             activity.moveTaskToBack(true)
         }
+    }
+
+    fun choosePosition(pos: String) {
+        prefs.edit()
+            .putString(MirrorService.KEY_POS, pos)
+            .putBoolean(MirrorService.KEY_CUSTOM, false)
+            .apply()
+        position = pos
+        // Tell the running service to move the button now.
+        context.startService(
+            Intent(context, MirrorService::class.java)
+                .setAction(MirrorService.ACTION_SET_POSITION)
+        )
     }
 
     Column(
@@ -73,11 +99,21 @@ fun MirrorSetupScreen() {
     ) {
         Text("Screen Mirror", style = MaterialTheme.typography.headlineMedium)
         Text(
-            "How it works: tap Start Mirror, then a small \"Mirror\" button sits in the " +
-                "top-right corner over any app. Tap it to freeze the current screen and " +
-                "flip it horizontally. In the flipped view you can toggle the mirror on/off " +
-                "or close it. It's a snapshot of that moment, not a live feed."
+            "Tap Start Mirror, then a floating Mirror button appears over any app. " +
+                "Tap it to freeze the current screen and flip it horizontally. You can " +
+                "also drag the button anywhere with your finger."
         )
+
+        Text("Button position", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("top", "bottom", "left", "right").forEach { pos ->
+                FilterChip(
+                    selected = position == pos,
+                    onClick = { choosePosition(pos) },
+                    label = { Text(pos.replaceFirstChar { it.uppercase() }) }
+                )
+            }
+        }
 
         Button(
             onClick = { requestOverlay(context) },
@@ -102,7 +138,7 @@ fun MirrorSetupScreen() {
     }
 }
 
-private fun requestOverlay(context: android.content.Context) {
+private fun requestOverlay(context: Context) {
     if (!Settings.canDrawOverlays(context)) {
         val intent = Intent(
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
