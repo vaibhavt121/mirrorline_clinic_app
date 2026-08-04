@@ -62,6 +62,7 @@ class MirrorService : Service() {
         const val KEY_CX = "cx"
         const val KEY_CY = "cy"
         const val KEY_FLIP = "flip"   // "h" = left-right, "v" = up-down, "n" = none
+        const val KEY_ROT = "rot"     // rotation in degrees: 0, 90, 180, 270
 
         private const val CHANNEL_ID = "mirror_channel"
         private const val NOTIF_ID = 42
@@ -74,6 +75,7 @@ class MirrorService : Service() {
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var mirrorView: View? = null
     private var flipMode = "h" // "h" = left-right, "v" = up-down, "n" = none
+    private var rotationDeg = 0 // 0, 90, 180, 270
 
     private val captureThread = HandlerThread("capture").apply { start() }
     private val captureHandler = Handler(captureThread.looper)
@@ -336,7 +338,9 @@ class MirrorService : Service() {
     }
 
     private fun showMirror(bitmap: Bitmap) {
-        flipMode = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_FLIP, "h") ?: "h"
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        flipMode = prefs.getString(KEY_FLIP, "h") ?: "h"
+        rotationDeg = prefs.getInt(KEY_ROT, 0)
 
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
 
@@ -344,7 +348,7 @@ class MirrorService : Service() {
             scaleType = ImageView.ScaleType.FIT_CENTER
             setImageBitmap(bitmap)
         }
-        applyFlip(imageView)
+        applyTransform(imageView)
         root.addView(
             imageView,
             FrameLayout.LayoutParams(
@@ -357,18 +361,30 @@ class MirrorService : Service() {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(0xCC000000.toInt())
         }
-        fun barButton(label: String, onClick: () -> Unit): Button {
+        fun barButton(label: String, onClick: (Button) -> Unit): Button {
             return Button(this).apply {
                 text = label
-                setOnClickListener { onClick() }
+                textSize = 12f
+                setOnClickListener { onClick(this) }
                 layoutParams = LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
                 )
             }
         }
-        bar.addView(barButton("Left-Right") { setFlip("h", imageView) })
-        bar.addView(barButton("Up-Down") { setFlip("v", imageView) })
-        bar.addView(barButton("Normal") { setFlip("n", imageView) })
+        bar.addView(barButton("L-R") { setFlip("h", imageView) })
+        bar.addView(barButton("U-D") { setFlip("v", imageView) })
+        bar.addView(barButton("Rotate ${rotationDeg}\u00B0") { b ->
+            rotationDeg = (rotationDeg + 90) % 360
+            b.text = "Rotate ${rotationDeg}\u00B0"
+            applyTransform(imageView)
+            prefs.edit().putInt(KEY_ROT, rotationDeg).apply()
+        })
+        bar.addView(barButton("Reset") {
+            setFlip("n", imageView)
+            rotationDeg = 0
+            applyTransform(imageView)
+            prefs.edit().putInt(KEY_ROT, 0).apply()
+        })
         bar.addView(barButton("Close") { removeMirror(); showBubble() })
 
         root.addView(
@@ -389,17 +405,18 @@ class MirrorService : Service() {
         mirrorView = root
     }
 
-    private fun applyFlip(iv: ImageView) {
+    private fun applyTransform(iv: ImageView) {
         when (flipMode) {
             "v" -> { iv.scaleX = 1f; iv.scaleY = -1f }   // up-down (horizontal mirror line)
             "n" -> { iv.scaleX = 1f; iv.scaleY = 1f }    // no flip
             else -> { iv.scaleX = -1f; iv.scaleY = 1f }  // left-right (vertical mirror line)
         }
+        iv.rotation = rotationDeg.toFloat()
     }
 
     private fun setFlip(mode: String, iv: ImageView) {
         flipMode = mode
-        applyFlip(iv)
+        applyTransform(iv)
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_FLIP, mode).apply()
     }
 
