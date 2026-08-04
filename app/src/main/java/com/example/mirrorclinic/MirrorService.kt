@@ -402,8 +402,8 @@ class MirrorService : Service() {
         refreshHighlight()
 
         val hint = TextView(this).apply {
-            text = "Place the phone against your mirror, then tap the tab whose " +
-                "reflection reads correctly. (Leaning on the mirror = Left/Right.)"
+            text = "Tap the tab for the side your mirror is on (Top mirror = Top). " +
+                "Then check the reflection in the mirror reads correctly."
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 11f
             setBackgroundColor(0xCC000000.toInt())
