@@ -1,39 +1,32 @@
-# Mirror Clinic (demo)
+# Screen Mirror (freeze-and-flip)
 
-A minimal, buildable Android app that demonstrates a **horizontal "mirror mode"**
-applied to an entire app's UI, unrooted. Flip the switch in the top bar and every
-icon, label, list, text field and control mirrors -- while every control still
-responds where you *see* it.
+A phone app (no root) that captures the current screen of **any** app and shows
+it **flipped horizontally**. It is a snapshot, not a live feed -- that is exactly
+why it works without root (a live same-screen flip hits an unavoidable capture
+feedback loop).
 
-## Why this approach
+## How to use
+1. Install and open the app.
+2. Tap **1. Allow display over other apps** and grant it.
+3. Tap **2. Start Mirror** and approve the screen-capture prompt.
+4. A small **Mirror** button now floats in the top-right corner over every app.
+5. Open any app, tap **Mirror** -> the current screen freezes and flips.
+6. In the flipped view: **Mirror: ON/OFF** toggles the flip, **Close** returns
+   to the floating button.
+7. Stop it anytime from the notification (**Stop**).
 
-Flipping the *whole phone OS* on its *own screen*, unrooted, is not possible on
-stock Android (MediaProjection re-captures your own flipped output in a feedback
-loop, and no unrooted API exposes a horizontal-flip display transform). Flipping
-*your own app's UI* is trivial and 100% reliable, because a single Compose
-`graphicsLayer { scaleX = -1f }` flips the drawing **and** Compose inverts the
-same transform for touch hit-testing -- so no coordinate remapping is needed.
+## Build an APK
+### GitHub Actions (no tools to install)
+Push this project to a GitHub repo, open the **Actions** tab, wait for **Build
+APK** to finish, then download the **screen-mirror-debug-apk** artifact and
+unzip it to get `app-debug.apk`.
 
-See `MirrorApp.kt` -- the whole effect is one modifier.
+### Android Studio
+Open the folder, let Gradle sync, then **Build > Build APK(s)**.
 
-## Get an installable APK -- two options
-
-### Option A: GitHub Actions (no tools to install)
-1. Create a new GitHub repo and push this folder to it
-   (or upload the zip contents).
-2. Open the **Actions** tab. The "Build APK" workflow runs automatically.
-3. When it finishes, open the run and download the **mirror-clinic-debug-apk**
-   artifact. Unzip it to get `app-debug.apk`.
-4. Copy it to your phone and install (enable "Install unknown apps").
-
-### Option B: Android Studio
-1. Open this folder in Android Studio (Giraffe or newer).
-2. Let it sync Gradle.
-3. **Build > Build App Bundle(s) / APK(s) > Build APK(s)**, or just Run on a device.
-
-## Notes
-- Text appears reversed when mirrored -- that is inherent to a true horizontal
-  flip. In a physical mirror / beam-splitter rig, the reflection reads correctly.
-- To flip a live CameraX preview too, use `PreviewView` in **COMPATIBLE**
-  (TextureView) mode so the flip applies; SurfaceView-backed previews render on a
-  separate surface and will not flip with a view transform.
+## Honest limits
+- Each tap is a freeze-frame; it does not keep updating while flipped. Tap again
+  for a fresh capture.
+- Secure surfaces (some banking apps, DRM video) capture as black by Android
+  design.
+- The captured frame reflects whatever was on screen the instant you tapped.

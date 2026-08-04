@@ -7,15 +7,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-private val LightColors = lightColorScheme(
-    primary = Teal40,
-    secondary = Slate40
-)
-
-private val DarkColors = darkColorScheme(
-    primary = Teal80,
-    secondary = Slate80
-)
+private val LightColors = lightColorScheme(primary = Teal40, secondary = Slate40)
+private val DarkColors = darkColorScheme(primary = Teal80, secondary = Slate80)
 
 @Composable
 fun MirrorClinicTheme(
