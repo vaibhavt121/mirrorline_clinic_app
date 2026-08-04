@@ -61,8 +61,7 @@ class MirrorService : Service() {
         const val KEY_CUSTOM = "custom" // true if the user dragged it
         const val KEY_CX = "cx"
         const val KEY_CY = "cy"
-        const val KEY_FLIP = "flip"   // "h" = left-right, "v" = up-down, "n" = none
-        const val KEY_ROT = "rot"     // rotation in degrees: 0, 90, 180, 270
+        const val KEY_SIDE = "side"   // "right" | "left" | "top" | "bottom"
 
         private const val CHANNEL_ID = "mirror_channel"
         private const val NOTIF_ID = 42
@@ -74,8 +73,7 @@ class MirrorService : Service() {
     private var bubbleView: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var mirrorView: View? = null
-    private var flipMode = "h" // "h" = left-right, "v" = up-down, "n" = none
-    private var rotationDeg = 0 // 0, 90, 180, 270
+    private var side = "right" // "right" | "left" | "top" | "bottom"
 
     private val captureThread = HandlerThread("capture").apply { start() }
     private val captureHandler = Handler(captureThread.looper)
@@ -339,8 +337,7 @@ class MirrorService : Service() {
 
     private fun showMirror(bitmap: Bitmap) {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        flipMode = prefs.getString(KEY_FLIP, "h") ?: "h"
-        rotationDeg = prefs.getInt(KEY_ROT, 0)
+        side = prefs.getString(KEY_SIDE, "right") ?: "right"
 
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
 
@@ -348,7 +345,7 @@ class MirrorService : Service() {
             scaleType = ImageView.ScaleType.FIT_CENTER
             setImageBitmap(bitmap)
         }
-        applyTransform(imageView)
+        applyMirror(imageView)
         root.addView(
             imageView,
             FrameLayout.LayoutParams(
@@ -361,31 +358,47 @@ class MirrorService : Service() {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(0xCC000000.toInt())
         }
-        fun barButton(label: String, onClick: (Button) -> Unit): Button {
+
+        val sideButtons = mutableMapOf<String, Button>()
+        fun refreshHighlight() {
+            sideButtons.forEach { (key, btn) ->
+                btn.setBackgroundColor(if (key == side) 0xFF00796B.toInt() else 0xFF444444.toInt())
+                btn.setTextColor(0xFFFFFFFF.toInt())
+            }
+        }
+        fun sideTab(label: String, value: String): Button {
             return Button(this).apply {
                 text = label
                 textSize = 12f
-                setOnClickListener { onClick(this) }
+                setOnClickListener {
+                    side = value
+                    applyMirror(imageView)
+                    prefs.edit().putString(KEY_SIDE, value).apply()
+                    refreshHighlight()
+                }
                 layoutParams = LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
                 )
+                sideButtons[value] = this
             }
         }
-        bar.addView(barButton("L-R") { setFlip("h", imageView) })
-        bar.addView(barButton("U-D") { setFlip("v", imageView) })
-        bar.addView(barButton("Rotate ${rotationDeg}\u00B0") { b ->
-            rotationDeg = (rotationDeg + 90) % 360
-            b.text = "Rotate ${rotationDeg}\u00B0"
-            applyTransform(imageView)
-            prefs.edit().putInt(KEY_ROT, rotationDeg).apply()
-        })
-        bar.addView(barButton("Reset") {
-            setFlip("n", imageView)
-            rotationDeg = 0
-            applyTransform(imageView)
-            prefs.edit().putInt(KEY_ROT, 0).apply()
-        })
-        bar.addView(barButton("Close") { removeMirror(); showBubble() })
+        bar.addView(sideTab("Right", "right"))
+        bar.addView(sideTab("Left", "left"))
+        bar.addView(sideTab("Top", "top"))
+        bar.addView(sideTab("Bottom", "bottom"))
+
+        val close = Button(this).apply {
+            text = "Close"
+            textSize = 12f
+            setBackgroundColor(0xFF222222.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
+            setOnClickListener { removeMirror(); showBubble() }
+            layoutParams = LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+            )
+        }
+        bar.addView(close)
+        refreshHighlight()
 
         root.addView(
             bar,
@@ -405,19 +418,16 @@ class MirrorService : Service() {
         mirrorView = root
     }
 
-    private fun applyTransform(iv: ImageView) {
-        when (flipMode) {
-            "v" -> { iv.scaleX = 1f; iv.scaleY = -1f }   // up-down (horizontal mirror line)
-            "n" -> { iv.scaleX = 1f; iv.scaleY = 1f }    // no flip
-            else -> { iv.scaleX = -1f; iv.scaleY = 1f }  // left-right (vertical mirror line)
+    /**
+     * Pure mirror reflection for a mirror standing on the chosen side.
+     * A mirror on the left/right edge reflects left-right (flip X).
+     * A mirror on the top/bottom edge reflects up-down (flip Y).
+     */
+    private fun applyMirror(iv: ImageView) {
+        when (side) {
+            "top", "bottom" -> { iv.scaleX = 1f; iv.scaleY = -1f }
+            else            -> { iv.scaleX = -1f; iv.scaleY = 1f } // right or left
         }
-        iv.rotation = rotationDeg.toFloat()
-    }
-
-    private fun setFlip(mode: String, iv: ImageView) {
-        flipMode = mode
-        applyTransform(iv)
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_FLIP, mode).apply()
     }
 
     private fun removeMirror() {
