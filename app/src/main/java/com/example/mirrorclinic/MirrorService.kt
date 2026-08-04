@@ -33,6 +33,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.content.IntentCompat
 import kotlin.math.abs
 
@@ -400,8 +401,33 @@ class MirrorService : Service() {
         bar.addView(close)
         refreshHighlight()
 
+        val hint = TextView(this).apply {
+            text = "Place the phone against your mirror, then tap the tab whose " +
+                "reflection reads correctly. (Leaning on the mirror = Left/Right.)"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 11f
+            setBackgroundColor(0xCC000000.toInt())
+            setPadding(16, 8, 16, 8)
+        }
+        val topContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(
+                bar,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+            addView(
+                hint,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
         root.addView(
-            bar,
+            topContainer,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
